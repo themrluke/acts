@@ -42,4 +42,4 @@ codegen/src/codegen.egg-info/
 !.devcontainer
 
 # My added files
-ctest_failed_geometry_tests.log
+*.log

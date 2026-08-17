@@ -130,7 +130,7 @@ void addDirectLayerSubsystem(const BlueprintBuilder& builder,
 }
 
 void addBarrelEndcapSubsystem(const BlueprintBuilder& builder,
-                              Acts::ContainerBlueprintNode& outer,
+                              Acts::BlueprintNode& outer,
                               std::string assembly, std::string det,
                               const std::regex& layerFilter) {
   const auto assemblyElement = builder.findDetElementByName(assembly);
@@ -253,12 +253,32 @@ std::unique_ptr<Acts::TrackingGeometry> buildOpenDataDetectorBarrelEndcap(
     mat.addChild(builder.backend().makeBeampipe());
   });
 
-  addBarrelEndcapSubsystem(builder, outer, "Pixels", "pix",
+  outer.addMaterial("PixelMaterial", [&](auto& mat) {
+    // OuterCylinder face, binned coarsely: 1 bin around phi, 20 along z
+    mat.configureFace(OuterCylinder,
+                      Acts::AxisSpec::DeferredEquidistant(1, AxisRPhi),
+                      Acts::AxisSpec::DeferredEquidistant(20, AxisZ));
+    addBarrelEndcapSubsystem(builder, mat, "Pixels", "pix",
                            ActsPlugins::DD4hep::detail::kPixelLayerFilter);
-  addBarrelEndcapSubsystem(builder, outer, "ShortStrips", "ss",
+  });
+
+  outer.addMaterial("ShortStripMaterial", [&](auto& mat) {
+    // OuterCylinder face, binned coarsely: 1 bin around phi, 20 along z
+    mat.configureFace(OuterCylinder,
+                      Acts::AxisSpec::DeferredEquidistant(1, AxisRPhi),
+                      Acts::AxisSpec::DeferredEquidistant(20, AxisZ));
+    addBarrelEndcapSubsystem(builder, mat, "ShortStrips", "ss",
                            ActsPlugins::DD4hep::detail::kShortStripLayerFilter);
-  addBarrelEndcapSubsystem(builder, outer, "LongStrips", "ls",
+  });
+
+  outer.addMaterial("LongStripMaterial", [&](auto& mat) {
+    // OuterCylinder face, binned coarsely: 1 bin around phi, 20 along z
+    mat.configureFace(OuterCylinder,
+                      Acts::AxisSpec::DeferredEquidistant(1, AxisRPhi),
+                      Acts::AxisSpec::DeferredEquidistant(20, AxisZ));
+    addBarrelEndcapSubsystem(builder, mat, "LongStrips", "ls",
                            ActsPlugins::DD4hep::detail::kLongStripLayerFilter);
+  });
 
   return root.construct(BlueprintOptions{}, gctx, logger);
 }

@@ -16,9 +16,11 @@
 #include "Acts/Geometry/NavigationPolicyFactory.hpp"
 #include "Acts/Geometry/VolumeAttachmentStrategy.hpp"
 #include "Acts/Geometry/VolumeResizeStrategy.hpp"
+#include "Acts/Geometry/MaterialDesignatorBlueprintNode.hpp"
 #include "Acts/Navigation/CylinderNavigationPolicy.hpp"
 #include "Acts/Navigation/SurfaceArrayNavigationPolicy.hpp"
 #include "Acts/Utilities/AxisDefinitions.hpp"
+#include "Acts/Utilities/AxisSpec.hpp"
 #include "ActsPlugins/DD4hep/BlueprintBuilder.hpp"
 
 #include <format>
@@ -227,6 +229,7 @@ std::unique_ptr<Acts::TrackingGeometry> buildOpenDataDetectorBarrelEndcap(
     const Acts::Logger& logger) {
   using namespace Acts;
   using enum AxisDirection;
+  using enum Acts::CylinderVolumeBounds::Face;
 
   BlueprintBuilder builder{{
                                .dd4hepDetector = &detector,
@@ -242,7 +245,13 @@ std::unique_ptr<Acts::TrackingGeometry> buildOpenDataDetectorBarrelEndcap(
   auto& outer = root.addCylinderContainer("OpenDataDetector", AxisR);
   outer.setAttachmentStrategy(VolumeAttachmentStrategy::Gap);
 
-  outer.addChild(builder.backend().makeBeampipe());
+  outer.addMaterial("BeampipeMaterial", [&](auto& mat) {
+    // OuterCylinder face, binned coarsely: 1 bin around phi, 20 along z
+    mat.configureFace(OuterCylinder,
+                      Acts::AxisSpec::DeferredEquidistant(1, AxisRPhi),
+                      Acts::AxisSpec::DeferredEquidistant(20, AxisZ));
+    mat.addChild(builder.backend().makeBeampipe());
+  });
 
   addBarrelEndcapSubsystem(builder, outer, "Pixels", "pix",
                            ActsPlugins::DD4hep::detail::kPixelLayerFilter);

@@ -40,14 +40,19 @@ namespace {
 
 auto makeLayerCustomizer(const BlueprintBuilder& builder, std::string det,
                          std::regex layerFilter) {
+  using enum Acts::CylinderVolumeBounds::Face;
+  using enum Acts::AxisDirection;
   return [&builder, det = std::move(det), layerFilter = std::move(layerFilter)](
              const std::optional<dd4hep::DetElement>& elem,
-             Acts::LayerBlueprintNode& layer) {
-    layer.setEnvelope(detail::kLayerEnvelope);
+             std::shared_ptr<Acts::LayerBlueprintNode> layer)
+             -> std::shared_ptr<Acts::BlueprintNode> {
+
+    // existing per=layer setup (now via the pointer)
+    layer->setEnvelope(detail::kLayerEnvelope);
 
     const std::string elemName =
         elem.has_value() ? std::string{builder.backend().nameOf(*elem)}
-                         : layer.name();
+                         : layer->name();
     const int layerIdx = detail::layerIndexFromName(elemName, layerFilter);
 
     using SrfArrayNavPol = Acts::SurfaceArrayNavigationPolicy;
@@ -56,7 +61,10 @@ auto makeLayerCustomizer(const BlueprintBuilder& builder, std::string det,
     SrfArrayNavPol::Config navCfg;
     navCfg.envelope = detail::kLayerEnvelope;
 
-    if (layer.layerType() == Acts::LayerBlueprintNode::LayerType::Cylinder) {
+
+    const bool isCylinder = 
+      layer->layerType() == Acts::LayerBlueprintNode::LayerType::Cylinder; 
+    if (isCylinder) {
       // Barrel layer
       navCfg.layerType = Cylinder;
       navCfg.bins = {
@@ -68,13 +76,29 @@ auto makeLayerCustomizer(const BlueprintBuilder& builder, std::string det,
       navCfg.bins = {builder.backend().constant("{}_e_sf_b_r", det),
                      builder.backend().constant("{}_e_sf_b_phi", det)};
     }
+    layer->setNavigationPolicyFactory(Acts::NavigationPolicyFactory{}
+                                     .add<Acts::CylinderNavigationPolicy>()
+                                     .add<SrfArrayNavPol>(navCfg)
+                                     .asUniquePtr());
 
-    layer.setNavigationPolicyFactory(Acts::NavigationPolicyFactory{}
-                                         .add<Acts::CylinderNavigationPolicy>()
-                                         .add<SrfArrayNavPol>(navCfg)
-                                         .asUniquePtr());
+
+    // wrap this layer in its own material designator node
+    auto mat = std::make_shared<Acts::MaterialDesignatorBlueprintNode>(
+        layer->name() + "_Mat");
+    if (isCylinder) {
+      mat->configureFace(OuterCylinder,
+                         Acts::AxisSpec::DeferredEquidistant(1, AxisRPhi),
+                         Acts::AxisSpec::DeferredEquidistant(20, AxisZ));
+    } else {
+      mat->configureFace(PositiveDisc,
+                         Acts::AxisSpec::DeferredEquidistant(10, AxisR),
+                         Acts::AxisSpec::DeferredEquidistant(1, AxisPhi));
+    }
+    mat->addChild(std::move(layer));
+    return mat;   // the assembler now adds the material-wrapped layer
   };
 }
+
 
 void addDirectLayerSubsystem(const BlueprintBuilder& builder,
                              Acts::ContainerBlueprintNode& outer,

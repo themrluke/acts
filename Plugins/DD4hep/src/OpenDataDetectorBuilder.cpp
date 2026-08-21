@@ -277,32 +277,15 @@ std::unique_ptr<Acts::TrackingGeometry> buildOpenDataDetectorBarrelEndcap(
     mat.addChild(builder.backend().makeBeampipe());
   });
 
-  outer.addMaterial("PixelMaterial", [&](auto& mat) {
-    // OuterCylinder face, binned coarsely: 1 bin around phi, 20 along z
-    mat.configureFace(OuterCylinder,
-                      Acts::AxisSpec::DeferredEquidistant(1, AxisRPhi),
-                      Acts::AxisSpec::DeferredEquidistant(20, AxisZ));
-    addBarrelEndcapSubsystem(builder, mat, "Pixels", "pix",
+  // Per-layer material is designated inside makeLayerCustomizer (see
+  // addBarrelEndcapSubsystem), so the subsystems are added directly to the
+  // container with no redundant subsystem-level material wrapper.
+  addBarrelEndcapSubsystem(builder, outer, "Pixels", "pix",
                            ActsPlugins::DD4hep::detail::kPixelLayerFilter);
-  });
-
-  outer.addMaterial("ShortStripMaterial", [&](auto& mat) {
-    // OuterCylinder face, binned coarsely: 1 bin around phi, 20 along z
-    mat.configureFace(OuterCylinder,
-                      Acts::AxisSpec::DeferredEquidistant(1, AxisRPhi),
-                      Acts::AxisSpec::DeferredEquidistant(20, AxisZ));
-    addBarrelEndcapSubsystem(builder, mat, "ShortStrips", "ss",
+  addBarrelEndcapSubsystem(builder, outer, "ShortStrips", "ss",
                            ActsPlugins::DD4hep::detail::kShortStripLayerFilter);
-  });
-
-  outer.addMaterial("LongStripMaterial", [&](auto& mat) {
-    // OuterCylinder face, binned coarsely: 1 bin around phi, 20 along z
-    mat.configureFace(OuterCylinder,
-                      Acts::AxisSpec::DeferredEquidistant(1, AxisRPhi),
-                      Acts::AxisSpec::DeferredEquidistant(20, AxisZ));
-    addBarrelEndcapSubsystem(builder, mat, "LongStrips", "ls",
+  addBarrelEndcapSubsystem(builder, outer, "LongStrips", "ls",
                            ActsPlugins::DD4hep::detail::kLongStripLayerFilter);
-  });
 
   return root.construct(BlueprintOptions{}, gctx, logger);
 }

@@ -168,13 +168,21 @@ def main():
         action="store_true",
         help="Enable propagation validation",
     )
+    p.add_argument(
+        "--gen3",
+        action="store_true",
+        help="Build the Gen3 (blueprint) ODD instead of Gen1",
+    )
 
     args = p.parse_args()
     materialDecorator = None
     if args.map != "":
         materialDecorator = acts.IMaterialDecorator.fromFile(args.map)
 
-    detector = getOpenDataDetector(materialDecorator)
+    if args.gen3:
+        detector = getOpenDataDetector(gen3=True, materialDecorator=materialDecorator)
+    else:
+        detector = getOpenDataDetector(materialDecorator)
     trackingGeometry = detector.trackingGeometry()
 
     materialSurfaces = trackingGeometry.extractMaterialSurfaces()

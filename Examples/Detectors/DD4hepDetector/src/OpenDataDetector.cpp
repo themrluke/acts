@@ -8,6 +8,9 @@
 
 #include "ActsExamples/DD4hepDetector/OpenDataDetector.hpp"
 
+#include "Acts/Geometry/TrackingGeometry.hpp"
+#include "Acts/Material/IMaterialDecorator.hpp"
+#include "Acts/Surfaces/Surface.hpp"
 #include "ActsPlugins/DD4hep/DD4hepDetectorElement.hpp"
 #include "ActsPlugins/DD4hep/OpenDataDetectorBuilder.hpp"
 #include "ActsPlugins/Root/TGeoAxes.hpp"
@@ -22,28 +25,41 @@ OpenDataDetector::OpenDataDetector(const Config& cfg,
                                    const Acts::GeometryContext& gctx)
     : DD4hepDetectorBase{cfg}, m_cfg{cfg} {
   ACTS_INFO("OpenDataDetector construct");
+
+  std::unique_ptr<Acts::TrackingGeometry> trackingGeometry;
   switch (m_cfg.constructionMethod) {
     case Config::ConstructionMethod::BarrelEndcap:
-      m_trackingGeometry =
-          ActsPlugins::DD4hep::buildOpenDataDetectorBarrelEndcap(
-              dd4hepDetector(), gctx, logger());
+      trackingGeometry = ActsPlugins::DD4hep::buildOpenDataDetectorBarrelEndcap(
+          dd4hepDetector(), gctx, logger());
       break;
     case Config::ConstructionMethod::DirectLayer:
-      m_trackingGeometry =
-          ActsPlugins::DD4hep::buildOpenDataDetectorDirectLayer(
-              dd4hepDetector(), gctx, logger());
+      trackingGeometry = ActsPlugins::DD4hep::buildOpenDataDetectorDirectLayer(
+          dd4hepDetector(), gctx, logger());
       break;
     case Config::ConstructionMethod::DirectLayerGrouped:
-      m_trackingGeometry =
+      trackingGeometry =
           ActsPlugins::DD4hep::buildOpenDataDetectorDirectLayerGrouped(
               dd4hepDetector(), gctx, logger());
       break;
     case Config::ConstructionMethod::TGeo:
-      m_trackingGeometry =
+      trackingGeometry =
           ActsPlugins::DD4hep::buildOpenDataDetectorBarrelEndcapViaTGeo(
               *dd4hepDetector().world().placement().ptr(), gctx, logger());
       break;
   }
+
+  // Gen3 read-back: if a material map was supplied, decorate the geometry with
+  // it before storing the (const) tracking geometry. The mutable traversal
+  // visits every portal/face surface, so the per-layer designated faces are
+  // matched by GeometryIdentifier; all other surfaces are a silent no-op.
+  if (m_cfg.materialDecorator != nullptr) {
+    ACTS_INFO("Applying material map to Gen3 ODD geometry");
+    trackingGeometry->apply([&](Acts::Surface& surface) {
+      m_cfg.materialDecorator->decorate(surface);
+    });
+  }
+
+  m_trackingGeometry = std::move(trackingGeometry);
 }
 
 auto OpenDataDetector::config() const -> const Config& {

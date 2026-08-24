@@ -117,7 +117,11 @@ def getOpenDataDetector(
             )
             raise RuntimeError(msg)
 
-    if materialDecorator is None:
+    # Only Gen1 falls back to the default ODD material map. The default map is
+    # keyed by Gen1 geometry IDs, so applying it to Gen3 would spuriously match
+    # a handful of surfaces by coincident IDs; Gen3 only carries material when a
+    # matching map is passed explicitly.
+    if materialDecorator is None and not gen3:
         materialDecorator = _defaultMaterialDecorator(odd_dir, customLogLevel)
 
     if gen3:
@@ -131,6 +135,7 @@ def getOpenDataDetector(
             name="OpenDataDetector",
             logLevel=customLogLevel(),
             dd4hepLogLevel=customLogLevel(minLevel=acts.logging.WARNING),
+            materialDecorator=materialDecorator,
         )
         if constructionMethod is not None:
             oddConfig.constructionMethod = constructionMethod

@@ -9,6 +9,7 @@
 #pragma once
 
 #include "Acts/Geometry/Extent.hpp"
+#include "Acts/Material/IMaterialDecorator.hpp"
 #include "Acts/Utilities/AxisDefinitions.hpp"
 #include "ActsExamples/DD4hepDetector/DD4hepDetector.hpp"
 
@@ -53,6 +54,10 @@ class OpenDataDetector final : public DD4hepDetectorBase {
         Acts::ExtentEnvelope::Zero()
             .set(Acts::AxisDirection::AxisZ, {2., 2.})
             .set(Acts::AxisDirection::AxisR, {2., 2.});
+
+    /// Optional material decorator applied after construction (Gen3 read-back).
+    /// If set, the constructed geometry is decorated with this map's material.
+    std::shared_ptr<const Acts::IMaterialDecorator> materialDecorator = nullptr;
   };
 
   static std::shared_ptr<ActsPlugins::DD4hepDetectorElement>

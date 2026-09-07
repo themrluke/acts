@@ -21,6 +21,9 @@ def runTruthTrackingKalman(
     reverseFilteringMomThreshold=0 * u.GeV,
     reverseFilteringCovarianceScaling=100.0,
     numParticles=1,
+    etaRange=(-3.0, 3.0),
+    geant4Detector=None,
+    killSecondaries=False,
     linkForward: bool = False,
     useJosephFormulation: bool = False,
     s: acts.examples.Sequencer = None,
@@ -32,6 +35,7 @@ def runTruthTrackingKalman(
         PhiConfig,
         MomentumConfig,
         addFatras,
+        addGeant4,
         addDigitization,
         ParticleSelectorConfig,
         addDigiParticleSelection,
@@ -70,7 +74,7 @@ def runTruthTrackingKalman(
             ParticleConfig(
                 num=numParticles, pdg=generatedParticleType, randomizeCharge=True
             ),
-            EtaConfig(-3.0, 3.0, uniform=True),
+            EtaConfig(etaRange[0], etaRange[1], uniform=True),
             MomentumConfig(1.0 * u.GeV, 100.0 * u.GeV, transverse=True),
             PhiConfig(0.0, 360.0 * u.degree),
             vtxGen=acts.examples.GaussianVertexGenerator(
@@ -92,7 +96,22 @@ def runTruthTrackingKalman(
         )
         s.addWhiteboardAlias("particles", "particles_generated")
 
-    if inputHitsPath is None:
+    if inputHitsPath is None and geant4Detector is not None:
+        # Geant4 simulates through its own (full) geometry, so the scattering
+        # truth is independent of the material the fitter later uses.
+        if s.config.numThreads != 1:
+            raise ValueError("Geant 4 simulation does not support multi-threading")
+        addGeant4(
+            s,
+            geant4Detector,
+            trackingGeometry,
+            field,
+            rnd=rnd,
+            killVolume=trackingGeometry.highestTrackingVolume,
+            killAfterTime=25 * u.ns,
+            killSecondaries=killSecondaries,
+        )
+    elif inputHitsPath is None:
         addFatras(
             s,
             trackingGeometry,

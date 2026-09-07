@@ -266,7 +266,16 @@ std::unique_ptr<Acts::TrackingGeometry> buildOpenDataDetectorBarrelEndcap(
   blueprintCfg.envelope = ActsPlugins::DD4hep::detail::kBlueprintEnvelope;
   Blueprint root{blueprintCfg};
 
-  auto& outer = root.addCylinderContainer("OpenDataDetector", AxisR);
+  // The detector's own outer boundary is the only full-length surface beyond
+  // the long strips, so it is where the outer support / solenoid material
+  // (which sits just outside the tracking volume) has to be collected.
+  auto& outerSupport = root.addMaterial("OuterSupportMaterial", [&](auto& mat) {
+    mat.configureFace(OuterCylinder,
+                      Acts::AxisSpec::DeferredEquidistant(1, AxisRPhi),
+                      Acts::AxisSpec::DeferredEquidistant(20, AxisZ));
+  });
+
+  auto& outer = outerSupport.addCylinderContainer("OpenDataDetector", AxisR);
   outer.setAttachmentStrategy(VolumeAttachmentStrategy::Gap);
 
   outer.addMaterial("BeampipeMaterial", [&](auto& mat) {

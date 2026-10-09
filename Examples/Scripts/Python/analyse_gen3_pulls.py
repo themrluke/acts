@@ -12,6 +12,7 @@ a ``uproot.py`` shim which shadows the real uproot.
 """
 
 import argparse
+import math
 from pathlib import Path
 
 import numpy as np
@@ -26,13 +27,35 @@ PULLS = {
 }
 
 
-def width(values, clip=5.0):
-    """Robust Gaussian width: std of the sample after clipping outliers."""
+def _truncated_unit_sigma(clip):
+    """Std of a unit Gaussian truncated at +-clip, used to undo the clipping bias."""
+    return math.sqrt(
+        math.erf(clip / math.sqrt(2))
+        - clip * math.sqrt(2 / math.pi) * math.exp(-clip * clip / 2)
+    )
+
+
+def width(values, clip=2.0):
+    """Width of the Gaussian *core* of the pull distribution.
+
+    Clips at +-clip and divides out the bias that clipping introduces, so a true
+    unit Gaussian reads 1.000 at any threshold.
+
+    The tight default is deliberate.  Geant4 produces non-Gaussian scattering
+    tails (single large-angle scatters, delta rays) that the Kalman filter's
+    Gaussian noise model cannot represent, and no material map can remove them.
+    A loose clip therefore measures those tails as much as the map: at clip 5 an
+    ODD map carrying twice the true inner material scores *better* than the
+    truth-matched one, because the surplus material widens sigma enough to
+    absorb the tails.  At clip 2 that map is correctly ranked worse.
+    """
     values = values[np.isfinite(values)]
     if values.size < 10:
         return np.nan, values.size
     kept = values[np.abs(values) < clip]
-    return float(np.std(kept)), int(kept.size)
+    if kept.size < 10:
+        return np.nan, kept.size
+    return float(np.std(kept) / _truncated_unit_sigma(clip)), int(kept.size)
 
 
 def summarise(path, eta_bins, eta_max):

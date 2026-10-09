@@ -291,8 +291,17 @@ std::unique_ptr<Acts::TrackingGeometry> buildOpenDataDetectorBarrelEndcap(
   // container with no redundant subsystem-level material wrapper.
   addBarrelEndcapSubsystem(builder, outer, "Pixels", "pix",
                            ActsPlugins::DD4hep::detail::kPixelLayerFilter);
-  addBarrelEndcapSubsystem(builder, outer, "ShortStrips", "ss",
-                           ActsPlugins::DD4hep::detail::kShortStripLayerFilter);
+  // The short-strip inner boundary is the only full-length surface near
+  // r ~ 240 mm. Forward tracks cross it beyond the last pixel disc, where no
+  // layer face is in reach. Binned finely in z: at 20 bins the 400 mm cells
+  // average over regions with very different material and over-count.
+  outer.addMaterial("ShortStripInnerMaterial", [&](auto& mat) {
+    mat.configureFace(InnerCylinder,
+                      Acts::AxisSpec::DeferredEquidistant(1, AxisRPhi),
+                      Acts::AxisSpec::DeferredEquidistant(100, AxisZ));
+    addBarrelEndcapSubsystem(builder, mat, "ShortStrips", "ss",
+                             ActsPlugins::DD4hep::detail::kShortStripLayerFilter);
+  });
   addBarrelEndcapSubsystem(builder, outer, "LongStrips", "ls",
                            ActsPlugins::DD4hep::detail::kLongStripLayerFilter);
 

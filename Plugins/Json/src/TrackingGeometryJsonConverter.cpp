@@ -43,9 +43,11 @@
 #include "ActsPlugins/Json/GridJsonConverter.hpp"
 #include "ActsPlugins/Json/SurfaceJsonConverter.hpp"
 #include "ActsPlugins/Json/UtilitiesJsonConverter.hpp"
+#include "ActsPlugins/Json/detail/JsonIo.hpp"
 
+#include <array>
+#include <cstdint>
 #include <filesystem>
-#include <fstream>
 #include <stdexcept>
 #include <unordered_set>
 
@@ -295,6 +297,15 @@ std::unique_ptr<Acts::INavigationPolicy> decodeSurfaceArrayNavigationPolicy(
   if (encoded.contains("envelope")) {
     cfg.envelope = encoded.at("envelope").get<Acts::ExtentEnvelope>();
   }
+  if (encoded.contains("neighborWindow")) {
+    const auto& jWindow = encoded.at("neighborWindow");
+    cfg.neighborWindow = Acts::SurfaceArray::NeighborWindow{
+        jWindow.at("min").get<std::array<std::uint8_t, 2>>(),
+        jWindow.at("max").get<std::array<std::uint8_t, 2>>()};
+  }
+  if (encoded.contains("overfill")) {
+    cfg.overfill = encoded.at("overfill").get<std::uint8_t>();
+  }
 
   return std::make_unique<Acts::SurfaceArrayNavigationPolicy>(gctx, volume,
                                                               logger, cfg);
@@ -338,6 +349,11 @@ nlohmann::json encodeSurfaceArrayNavigationPolicy(
   jPolicy["bins0"] = cfg.bins.first;
   jPolicy["bins1"] = cfg.bins.second;
   jPolicy["envelope"] = cfg.envelope;
+  if (cfg.neighborWindow.has_value()) {
+    jPolicy["neighborWindow"] = {{"min", cfg.neighborWindow->min},
+                                 {"max", cfg.neighborWindow->max}};
+  }
+  jPolicy["overfill"] = cfg.overfill;
   return jPolicy;
 }
 
@@ -419,24 +435,12 @@ std::unique_ptr<Acts::GridPortalLink> makeGridPortalLink(
     throw std::invalid_argument(
         "makeGridPortalLink() - Non regular surface was passed");
   }
+  // type-erased factories: dispatching here would instantiate every
+  // GridPortalLinkT axis combination in this translation unit
   if (axis1 == nullptr) {
-    axis0.visit([&](const auto& a0) {
-      using axis_t = std::remove_cvref_t<decltype(a0)>;
-      axis_t axisCopy = a0;
-      grid =
-          Acts::GridPortalLink::make(surface, direction, std::move(axisCopy));
-    });
+    grid = Acts::GridPortalLink::make(surface, direction, axis0);
   } else {
-    axis0.visit([&](const auto& a0) {
-      using axis0_t = std::remove_cvref_t<decltype(a0)>;
-      axis0_t axis0Copy = a0;
-      axis1->visit([&](const auto& a1) {
-        using axis1_t = std::remove_cvref_t<decltype(a1)>;
-        axis1_t axis1Copy = a1;
-        grid = Acts::GridPortalLink::make(surface, std::move(axis0Copy),
-                                          std::move(axis1Copy));
-      });
-    });
+    grid = Acts::GridPortalLink::make(surface, axis0, *axis1);
   }
 
   if (grid == nullptr) {
@@ -1205,28 +1209,33 @@ Acts::TrackingGeometryJsonConverter::trackingVolumeFromJson(
   return std::shared_ptr<TrackingVolume>(std::move(root));
 }
 
+void Acts::TrackingGeometryJsonConverter::toFile(
+    const GeometryContext& gctx, const TrackingGeometry& geometry,
+    const std::filesystem::path& path, const Options& options) const {
+  ACTS_DEBUG("Writing TrackingGeometry to '" << path.string() << "'");
+  detail::writeJsonFile(path, toJson(gctx, geometry, options),
+                        options.indentation, options.compressionLevel);
+}
+
+std::shared_ptr<Acts::TrackingGeometry>
+Acts::TrackingGeometryJsonConverter::fromFile(const GeometryContext& gctx,
+                                              const std::filesystem::path& path,
+                                              const Options& options) const {
+  ACTS_DEBUG("Reading TrackingGeometry from '" << path.string() << "'");
+  return fromJson(gctx, detail::readJsonFile(path), options);
+}
+
 std::shared_ptr<Acts::TrackingGeometry>
 Acts::TrackingGeometryJsonConverter::fromJson(const GeometryContext& gctx,
                                               const std::filesystem::path& path,
                                               const Options& options) const {
-  if (!std::filesystem::exists(path)) {
-    throw std::invalid_argument(std::format(
-        "TrackingGeometryJsonConverter() - JSON file {:} does not exist",
-        path.native()));
-  }
-  std::ifstream istr{path};
-  if (!istr.good()) {
-    throw std::invalid_argument(std::format(
-        "TrackingGeometryJsonConverter() - Cannot open '{:}'", path.native()));
-  }
-  nlohmann::json encoded{};
-  istr >> encoded;
-  return fromJsonPayload(gctx, encoded, options);
+  return fromFile(gctx, path, options);
 }
+
 std::shared_ptr<Acts::TrackingGeometry>
-Acts::TrackingGeometryJsonConverter::fromJsonPayload(
-    const GeometryContext& gctx, const nlohmann::json& encoded,
-    const Options& options) const {
+Acts::TrackingGeometryJsonConverter::fromJson(const GeometryContext& gctx,
+                                              const nlohmann::json& encoded,
+                                              const Options& options) const {
   ACTS_DEBUG("Reconstructing TrackingGeometry from JSON");
   auto world = trackingVolumeFromJson(gctx, encoded, options);
 

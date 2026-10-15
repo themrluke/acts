@@ -166,7 +166,7 @@ def runPypiFindingFittingDemo(
                     sf = surface_map[isl.geometryId()]
 
                     trackState = track.appendTrackState()
-                    trackState.typeFlags.isMeasurement = True
+                    trackState.typeFlags.setIsMeasurement()
                     trackState.uncalibratedSourceLink = sl
                     trackState.referenceSurface = sf
 
@@ -187,6 +187,7 @@ def runPypiFindingFittingDemo(
         )
     )
 
+    #! [Python pattern-recognition performance writer]
     # Add track finder performance writer
     cfg_finder = acts.examples.PythonPatternRecognitionPerformanceWriter.Config()
     cfg_finder.inputTracks = "fitted_tracks"
@@ -194,16 +195,25 @@ def runPypiFindingFittingDemo(
     cfg_finder.inputTrackParticleMatching = "track_particle_matching"
     cfg_finder.inputParticleTrackMatching = "particle_track_matching"
     cfg_finder.inputParticleMeasurementsMap = "particle_measurements_map"
+    cfg_finder.subDetectorTrackSummaryVolumes = {
+        "pixel": {7, 8, 9},
+        "sstrip": {12, 13, 14},
+        "lstrip": {16, 17, 18},
+    }
     perfWriterFinder = acts.examples.PythonPatternRecognitionPerformanceWriter(
         cfg_finder, acts.logging.INFO
     )
     s.addWriter(perfWriterFinder)
+    #! [Python pattern-recognition performance writer]
 
     # Add track fitter performance writer
+    import acts.examples.scipy as acts_scipy
+
     cfg_fitter = acts.examples.PythonTrackParameterPerformanceWriter.Config()
     cfg_fitter.inputTracks = "fitted_tracks"
     cfg_fitter.inputParticles = "particles"
     cfg_fitter.inputTrackParticleMatching = "track_particle_matching"
+    cfg_fitter.fitFunction = acts_scipy.makeScipyHistogramFitFunction()
     perfWriterFitter = acts.examples.PythonTrackParameterPerformanceWriter(
         cfg_fitter, acts.logging.INFO
     )

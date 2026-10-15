@@ -48,7 +48,7 @@ def getOpenDataDetector(
     constructionMethod=None,
     buildTracker=True,
     buildCalorimeter=True,
-    buildMuonSystem=True,
+    buildMuonSystem=False,
 ):
     """This function sets up the open data detector. Requires DD4hep.
     Parameters
@@ -126,9 +126,7 @@ def getOpenDataDetector(
 
     if gen3:
         if misaligned:
-            raise InvalidArgumentError(
-                "Gen3 ODD currently does not support misalignment"
-            )
+            raise ValueError("Gen3 ODD currently does not support misalignment")
 
         oddConfig = acts.examples.dd4hep.OpenDataDetector.Config(
             xmlFileNames=xml_files,

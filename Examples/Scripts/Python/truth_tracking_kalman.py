@@ -14,6 +14,7 @@ def runTruthTrackingKalman(
     field: acts.MagneticFieldProvider,
     digiConfigFile: Path,
     outputDir: Path,
+    pyVis=None,
     inputParticlePath: Optional[Path] = None,
     inputHitsPath: Optional[Path] = None,
     decorators=[],
@@ -25,6 +26,7 @@ def runTruthTrackingKalman(
     geant4Detector=None,
     killSecondaries=False,
     linkForward: bool = False,
+    referenceSurface: acts.Surface = acts.Surface.createPerigee(acts.Vector3(0, 0, 0)),
     useJosephFormulation: bool = False,
     s: acts.examples.Sequencer = None,
 ):
@@ -67,6 +69,13 @@ def runTruthTrackingKalman(
     outputDir = Path(outputDir)
 
     logger = acts.getDefaultLogger("Truth tracking example", acts.logging.INFO)
+
+    if pyVis is not None:
+        context = acts.GeometryContext.dangerouslyDefaultConstruct()
+        trackingGeometry.visualize(
+            pyVis,
+            context,
+        )
 
     if inputParticlePath is None:
         addParticleGun(
@@ -137,6 +146,7 @@ def runTruthTrackingKalman(
         field,
         digiConfigFile=digiConfigFile,
         rnd=rnd,
+        logLevel=acts.logging.DEBUG,
     )
 
     addDigiParticleSelection(
@@ -181,6 +191,7 @@ def runTruthTrackingKalman(
         initialSigmaQoverPt=0.1 / u.GeV,
         initialSigmaPtRel=0.1,
         initialVarInflation=[1e0, 1e0, 1e0, 1e0, 1e0, 1e0],
+        logLevel=acts.logging.INFO,
     )
 
     addKalmanTracks(
@@ -190,8 +201,17 @@ def runTruthTrackingKalman(
         reverseFilteringMomThreshold,
         reverseFilteringCovarianceScaling,
         linkForward=linkForward,
+        referenceSurface=referenceSurface,
         useJosephFormulation=useJosephFormulation,
+        logLevel=acts.logging.INFO,
     )
+
+    if pyVis is not None:
+        from acts.examples.visualization import TrackVisualizerAlg
+
+        s.addAlgorithm(
+            TrackVisualizerAlg("TrackVisualizerAlg", acts.logging.INFO, pyVis)
+        )
 
     s.addAlgorithm(
         acts.examples.TrackSelectorAlgorithm(
@@ -245,10 +265,12 @@ if "__main__" == __name__:
 
     # ODD
     from acts.examples.odd import getOpenDataDetector
+    from acts.examples.visualization import PyVisualization2D
 
-    detector = getOpenDataDetector()
+    detector = getOpenDataDetector(gen3=True)
     trackingGeometry = detector.trackingGeometry()
-    digiConfigFile = srcdir / "Examples/Configs/odd-digi-smearing-config.json"
+    decorators = detector.contextDecorators()
+    digiConfigFile = srcdir / "Examples/Configs/odd-digi-smearing-config-gen3.json"
 
     ## GenericDetector
     # detector = acts.examples.GenericDetector()
@@ -259,10 +281,15 @@ if "__main__" == __name__:
     # )
 
     field = acts.ConstantBField(acts.Vector3(0, 0, 2 * u.T))
-
-    runTruthTrackingKalman(
+    vis = PyVisualization2D()
+    s = runTruthTrackingKalman(
         trackingGeometry=trackingGeometry,
         field=field,
         digiConfigFile=digiConfigFile,
+        pyVis=vis,
         outputDir=Path.cwd(),
-    ).run()
+    )
+
+    s.run()
+
+    vis.plot(projection="xy", filename="truth_tracking_kalman_visualization.pdf")

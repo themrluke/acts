@@ -6,7 +6,7 @@
             "hidden": true,
             "generator": "Ninja",
             "cacheVariables": {
-                "CMAKE_CXX_STANDARD": "20",
+                "CMAKE_CXX_STANDARD": "23",
                 "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
                 "ACTS_ENABLE_LOG_FAILURE_THRESHOLD": "OFF",
@@ -92,9 +92,14 @@
                 "ACTS_BUILD_EXAMPLES_FASTJET": "ON",
                 "ACTS_USE_SYSTEM_NLOHMANN_JSON": "ON",
                 "ACTS_USE_SYSTEM_PYBIND11": "ON",
+                "ACTS_USE_SYSTEM_ACTSVG": "ON",
+                "ACTS_USE_SYSTEM_VECMEM": "ON",
+                "ACTS_USE_SYSTEM_COVFIE": "ON",
                 "ACTS_USE_SYSTEM_GBL": "OFF",
                 "ACTS_USE_SYSTEM_MILLE": "ON",
-                "ACTS_USE_SYSTEM_MP2": "ON"
+                "ACTS_USE_SYSTEM_MP2": "ON",
+                "DETRAY_USE_SYSTEM_GOOGLETEST": "ON",
+                "DETRAY_USE_SYSTEM_BENCHMARK": "ON"
             }
         },
         {
@@ -146,7 +151,6 @@
             "displayName": "GitHub-CI CUDA muon segment fitting",
             "inherits": "ci-common",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
                 "CMAKE_CUDA_ARCHITECTURES": "75;86",
                 "ACTS_ENABLE_CUDA": "ON",
                 "ACTS_BUILD_EXAMPLES": "ON",
@@ -167,11 +171,17 @@
         {
             "name": "github-ci-lcg",
             "displayName": "GitHub-CI LCG",
+            "description": "The LCG views are not the ci-dependencies spack environment, so every ACTS_USE_SYSTEM_* / DETRAY_USE_SYSTEM_* flag ci-common turns on has to be re-checked here and switched off unless the view carries a new enough copy.",
             "inherits": "ci-common",
             "cacheVariables": {
                 "ACTS_BUILD_PLUGIN_GEOMODEL": "OFF",
                 "ACTS_BUILD_PLUGIN_ARROW": "OFF",
                 "ACTS_BUILD_EXAMPLES_PARQUET": "OFF",
+                "ACTS_USE_SYSTEM_ACTSVG": "OFF",
+                "ACTS_USE_SYSTEM_VECMEM": "OFF",
+                "ACTS_USE_SYSTEM_COVFIE": "OFF",
+                "DETRAY_USE_SYSTEM_GOOGLETEST": "OFF",
+                "DETRAY_USE_SYSTEM_BENCHMARK": "OFF",
                 "ACTS_USE_SYSTEM_GBL": "OFF",
                 "ACTS_USE_SYSTEM_MILLE": "OFF",
                 "ACTS_USE_SYSTEM_MP2": "OFF",
@@ -181,12 +191,13 @@
         {
             "name": "github-ci-gnn",
             "displayName": "GitHub-CI Gnn",
+            "description": "GNN build for the gnn_build job. Warnings are errors, as everywhere else in CI. Only the Plugins/Gnn unit tests are ever run from this build, so the Core and Examples suites and the integration tests are switched off; Tests/UnitTests/CMakeLists.txt adds Plugins unconditionally, so the GNN ones survive. ODD, DD4hep and ROOT stay on because the `-k gpu` python tests need a detector and read back ROOT output. ACTS_USE_SYSTEM_MODULEMAPGRAPH takes the ci-dependencies build, which is compiled for cuda_arch=75 only (flavors/cuda13.yaml) against this preset's 75;86 -- relies on the fatbin carrying PTX for the 86 leg to JIT.",
             "generator": "Ninja",
             "inherits": "common",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_CXX_FLAGS": "-w",
-                "CMAKE_CUDA_FLAGS": "-w",
+                "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
+                "CMAKE_CUDA_STANDARD": "23",
                 "CMAKE_CUDA_ARCHITECTURES": "75;86",
                 "TORCH_CUDA_ARCH_LIST": "7.5;8.6",
                 "ACTS_FORCE_ASSERTIONS": "ON",
@@ -200,8 +211,12 @@
                 "ACTS_GNN_ENABLE_ONNX": "ON",
                 "ACTS_ENABLE_CUDA": "ON",
                 "ACTS_GNN_ENABLE_MODULEMAP": "ON",
+                "ACTS_BUILD_INTEGRATIONTESTS": "OFF",
+                "ACTS_BUILD_CORE_UNITTESTS": "OFF",
+                "ACTS_BUILD_EXAMPLES_UNITTESTS": "OFF",
                 "ACTS_USE_SYSTEM_NLOHMANN_JSON": "ON",
-                "ACTS_USE_SYSTEM_PYBIND11": "ON"
+                "ACTS_USE_SYSTEM_PYBIND11": "ON",
+                "ACTS_USE_SYSTEM_MODULEMAPGRAPH": "ON"
             }
         },
         {
@@ -209,7 +224,7 @@
             "displayName": "GitHub-CI Tensorrt",
             "generator": "Ninja",
             "cacheVariables": {
-                "CMAKE_CXX_STANDARD": "20",
+                "CMAKE_CXX_STANDARD": "23",
                 "CMAKE_BUILD_TYPE": "Release",
                 "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
                 "CMAKE_CUDA_ARCHITECTURES": "75;86",
@@ -231,13 +246,13 @@
             "displayName": "Python wheel",
             "generator": "Ninja",
             "cacheVariables": {
-                "CMAKE_CXX_STANDARD": "20",
+                "CMAKE_CXX_STANDARD": "23",
                 "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
                 "CMAKE_CXX_SCAN_FOR_MODULES": "OFF",
                 "CMAKE_FIND_FRAMEWORK": "LAST",
                 "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
                 "CMAKE_BUILD_TYPE": "Release",
-                "ACTS_FORCE_ASSERTIONS": "ON",
+                "ACTS_FORCE_ASSERTIONS": "OFF",
                 "ACTS_ENABLE_LOG_FAILURE_THRESHOLD": "ON",
                 "ACTS_BUILD_PYTHON_WHEEL": "ON",
                 "ACTS_BUILD_PYTHON_BINDINGS": "ON",

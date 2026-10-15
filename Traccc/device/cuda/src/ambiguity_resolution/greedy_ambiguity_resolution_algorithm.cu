@@ -1,9 +1,10 @@
-/** TRACCC library, part of the ACTS project (R&D line)
- *
- * (c) 2025-2026 CERN for the benefit of the ACTS project
- *
- * Mozilla Public License Version 2.0
- */
+// This file is part of the ACTS project.
+//
+// Copyright (C) 2016 CERN for the benefit of the ACTS project
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 // Project include(s).
 #include "../utils/cuda_error_handling.hpp"
@@ -25,7 +26,18 @@
 #include "traccc/cuda/ambiguity_resolution/greedy_ambiguity_resolution_algorithm.hpp"
 #include "traccc/definitions/math.hpp"
 
+// Project include(s).
+#include "traccc/utils/stream_synchronizing_allocator.hpp"
+
 // Thrust include(s).
+#include <thrust/version.h>
+
+// Thrust 3.1 adds a new constant iterator, replacing the Thrust one.
+#if THRUST_VERSION >= 300100
+#include <cuda/iterator>
+#else
+#include <thrust/iterator/constant_iterator.h>
+#endif
 #include <thrust/execution_policy.h>
 // Suppress warning (error at -Werror) from CUB/Thrust.
 #pragma GCC diagnostic push
@@ -34,7 +46,6 @@
 #pragma GCC diagnostic pop
 #include <thrust/fill.h>
 #include <thrust/functional.h>
-#include <thrust/iterator/constant_iterator.h>
 #include <thrust/reduce.h>
 #include <thrust/sort.h>
 #include <thrust/transform.h>
@@ -118,9 +129,9 @@ greedy_ambiguity_resolution_algorithm::operator()(
   cudaStream_t stream = details::get_stream(m_stream);
 
   // The Thrust policy to use.
-  auto thrust_policy =
-      thrust::cuda::par_nosync(std::pmr::polymorphic_allocator(&(m_mr.main)))
-          .on(stream);
+  auto thrust_policy = thrust::cuda::par_nosync(
+                           stream_synchronizing_allocator(m_mr.main, m_stream))
+                           .on(stream);
 
   const unsigned int n_tracks = tracks_view.tracks.capacity();
 
@@ -235,7 +246,11 @@ greedy_ambiguity_resolution_algorithm::operator()(
   // Counting can be done using reduce_by_key and constant iterator
   thrust::reduce_by_key(thrust_policy, flat_meas_ids_buffer.ptr(),
                         flat_meas_ids_buffer.ptr() + n_cands_total,
+#if THRUST_VERSION >= 300100
+                        ::cuda::make_constant_iterator(1),
+#else
                         thrust::make_constant_iterator(1),
+#endif
                         unique_meas_buffer.ptr(),
                         unique_meas_counts_buffer.ptr());
 
@@ -262,7 +277,7 @@ greedy_ambiguity_resolution_algorithm::operator()(
     m_stream.synchronize();
   }
 
-  // Retreive the counting vector to host for the size allocation of
+  // Retrieve the counting vector to host for the size allocation of
   // tracks_per_measurement
   std::vector<std::size_t> unique_meas_counts;
   m_copy
@@ -390,7 +405,7 @@ greedy_ambiguity_resolution_algorithm::operator()(
   m_copy.get().setup(is_updated_buffer)->ignore();
   m_copy.get().memset(is_updated_buffer, 0)->ignore();
 
-  // Count track id apperance during removal process
+  // Count track id appearance during removal process
   vecmem::data::vector_buffer<int> track_count_buffer{n_tracks, m_mr.main};
   m_copy.get().setup(track_count_buffer)->ignore();
   m_copy.get().memset(track_count_buffer, 0)->ignore();
@@ -578,12 +593,12 @@ greedy_ambiguity_resolution_algorithm::operator()(
     // The three kernels (block_inclusive_scan, scan_block_offsets, and
     // add_block_offset) work together to compute the prefix sum of track
     // IDs, with respect to the number of updated tracks, based on the
-    // indices of sorted_ids. The kernels are splitted as it is not
+    // indices of sorted_ids. The kernels are split as it is not
     // efficient to calculate this in a single kernel. This prefix sums are
     // used during the insertion sorting in rearrange_tracks to precisely
     // calculate the new index of updated tracks
 
-    // Caculate the prefix sum of the number of updated tracks block-wisely.
+    // Calculate the prefix sum of the number of updated tracks block-wisely.
     // block_offset is the last element of block-wise prefix sums, which is
     // used to get the real prefix sum later
     kernels::block_inclusive_scan<<<nBlocks_scan, nThreads_scan,

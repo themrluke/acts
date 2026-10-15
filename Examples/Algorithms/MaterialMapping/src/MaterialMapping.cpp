@@ -36,13 +36,20 @@ MaterialMapping::MaterialMapping(const MaterialMapping::Config& cfg,
   m_mappingState = m_cfg.materialMapper->createState(m_cfg.geoContext);
 }
 
-MaterialMapping::~MaterialMapping() {
-  Acts::TrackingGeometryMaterial detectorMaterial =
+ProcessCode MaterialMapping::finalize() {
+  m_material =
       m_cfg.materialMapper->finalizeMaps(*m_mappingState, m_cfg.geoContext);
-  // Loop over the available writers and write the maps
-  for (auto& imw : m_cfg.materialWriters) {
-    imw->writeMaterial(detectorMaterial);
+  for (auto& writer : m_cfg.materialWriters) {
+    writer->writeMaterial(*m_material);
   }
+  return ProcessCode::SUCCESS;
+}
+
+const Acts::TrackingGeometryMaterial& MaterialMapping::material() const {
+  if (!m_material) {
+    throw std::logic_error("Material maps are available after finalization");
+  }
+  return *m_material;
 }
 
 ProcessCode MaterialMapping::execute(const AlgorithmContext& context) const {
@@ -59,7 +66,8 @@ ProcessCode MaterialMapping::execute(const AlgorithmContext& context) const {
 
   for (const auto& [idTrack, mTrack] : mtrackCollection) {
     auto [mapped, unmapped] = m_cfg.materialMapper->mapMaterial(
-        *m_mappingState, context.geoContext, context.magFieldContext, mTrack);
+        *m_mappingState, context.recoGeoContext, context.magFieldContext,
+        mTrack);
 
     mappedTrackCollection.try_emplace(mappedTrackCollection.end(), idTrack,
                                       mapped);

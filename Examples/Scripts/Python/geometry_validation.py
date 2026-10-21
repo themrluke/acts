@@ -83,7 +83,9 @@ def main():
 
     if build_from_odd:
         buildGen3 = args.geo_mode == "gen3" or args.geo_mode == "detray"
-        with getOpenDataDetector(gen3=buildGen3, logLevel=logLevel) as detector:
+        with getOpenDataDetector(
+            gen3=buildGen3, materialDecorator=materialDecorator, logLevel=logLevel
+        ) as detector:
             trackingGeometry = detector.trackingGeometry()
             detectorStore["Detector"] = detector
             detectorStore["Volume"] = trackingGeometry.highestTrackingVolume

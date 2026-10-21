@@ -65,6 +65,11 @@ parser.add_argument(
     "--geant4", help="Use Geant4 instead of fatras", action="store_true"
 )
 parser.add_argument(
+    "--gen3",
+    help="Use the Gen3 ODD tracking geometry (requires --material-config and --digi-config)",
+    action="store_true",
+)
+parser.add_argument(
     "--ttbar",
     help="Use Pythia8 (ttbar, pile-up 200) instead of particle gun",
     action="store_true",
@@ -174,6 +179,11 @@ parser.add_argument(
 
 args = parser.parse_args()
 
+# The default material map and digitization config are keyed by Gen1 geometry
+# identifiers, so they would silently match the wrong Gen3 surfaces.
+if args.gen3 and (args.material_config is None or args.digi_config is None):
+    parser.error("--gen3 requires --material-config and --digi-config")
+
 outputDir = args.output
 ambi_ML = args.ambi_solver == "ML"
 ambi_scoring = args.ambi_solver == "scoring"
@@ -209,7 +219,9 @@ oddGbtsConnectionTable = (
 oddSeedingSel = actsDir / "Examples/Configs/odd-seeding-config.json"
 oddMaterialDeco = acts.IMaterialDecorator.fromFile(oddMaterialMap)
 
-detector = getOpenDataDetector(odd_dir=geoDir, materialDecorator=oddMaterialDeco)
+detector = getOpenDataDetector(
+    odd_dir=geoDir, materialDecorator=oddMaterialDeco, gen3=args.gen3
+)
 trackingGeometry = detector.trackingGeometry()
 decorators = detector.contextDecorators()
 field = acts.ConstantBField(acts.Vector3(0.0, 0.0, 2.0 * u.T))
